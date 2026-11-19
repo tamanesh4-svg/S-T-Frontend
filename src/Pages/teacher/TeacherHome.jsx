@@ -1,6 +1,9 @@
-
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://school-management-node-backend.onrender.com";
 
 const TeacherHome = () => {
   const navigate = useNavigate();
@@ -9,18 +12,31 @@ const TeacherHome = () => {
 
   useEffect(() => {
     const fetchTeacher = async () => {
+      const token = sessionStorage.getItem("teacherToken");
+
+      // no token saved means the user never logged in on this tab
+      if (!token) {
+        navigate("/teacher/login");
+        return;
+      }
+
       try {
-        const res = await fetch("https://school-management-node-backend.onrender.com/api/teacher/me", {
+        const res = await fetch(`${API_URL}/api/teacher/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           credentials: "include",
         });
 
         if (!res.ok) {
+          sessionStorage.removeItem("teacherToken");
+          sessionStorage.removeItem("teacher");
           navigate("/teacher/login");
           return;
         }
 
         const data = await res.json();
-        setTeacher(data);
+        setTeacher(data.teacher || data);
       } catch (err) {
         console.log(err);
         navigate("/teacher/login");
@@ -90,19 +106,15 @@ const TeacherHome = () => {
 
   return (
     <div className="min-h-screen bg-[#EAF3FF] px-4 sm:px-6 lg:px-10 py-8 md:py-12">
-
       <div className="max-w-7xl mx-auto">
-
         {/* ================= HEADER ================= */}
 
         <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 rounded-3xl p-7 sm:p-10 mb-10 shadow-xl">
-
           {/* Decorative circles */}
           <div className="absolute -right-10 -top-16 w-64 h-64 rounded-full bg-white/10"></div>
           <div className="absolute right-36 -bottom-24 w-52 h-52 rounded-full bg-white/10"></div>
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-
             <div>
               <div className="inline-flex items-center gap-2 bg-white/15 text-white px-4 py-2 rounded-full text-xs font-semibold tracking-wider mb-5 border border-white/20">
                 <span className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></span>
@@ -126,14 +138,12 @@ const TeacherHome = () => {
                 <span className="text-7xl lg:text-8xl">👨‍🏫</span>
               </div>
             </div>
-
           </div>
         </div>
 
         {/* ================= SECTION HEADING ================= */}
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-7">
-
           <div>
             <p className="text-blue-600 font-bold text-xs tracking-[0.2em] uppercase mb-2">
               Workspace
@@ -151,13 +161,11 @@ const TeacherHome = () => {
           <div className="bg-white border border-blue-100 px-4 py-2 rounded-xl shadow-sm text-sm text-blue-700 font-semibold w-fit">
             {features.length} Available Modules
           </div>
-
         </div>
 
         {/* ================= FEATURE CARDS ================= */}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-
           {features.map((feature, index) => (
             <FeatureBox
               key={feature.title}
@@ -166,7 +174,6 @@ const TeacherHome = () => {
               onClick={() => navigate(feature.path)}
             />
           ))}
-
         </div>
 
         {/* ================= FOOTER ================= */}
@@ -176,12 +183,10 @@ const TeacherHome = () => {
             Teacher Portal · Academic Management System
           </p>
         </div>
-
       </div>
     </div>
   );
 };
-
 
 // ================= REUSABLE FEATURE CARD =================
 
@@ -215,7 +220,6 @@ const FeatureBox = ({ title, desc, icon, tag, onClick, index }) => {
         focus:outline-none focus:ring-2 focus:ring-blue-400
       "
     >
-
       {/* Top accent */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-sky-400"></div>
 
@@ -223,10 +227,8 @@ const FeatureBox = ({ title, desc, icon, tag, onClick, index }) => {
       <div className="absolute -right-10 -bottom-12 w-36 h-36 rounded-full bg-blue-50 group-hover:scale-150 transition-transform duration-500"></div>
 
       <div className="relative z-10">
-
         {/* Icon and tag */}
         <div className="flex items-start justify-between mb-6">
-
           <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-3xl group-hover:bg-blue-600 group-hover:scale-110 transition-all duration-300">
             <span className="group-hover:scale-110 transition-transform">
               {icon}
@@ -236,7 +238,6 @@ const FeatureBox = ({ title, desc, icon, tag, onClick, index }) => {
           <span className="text-[10px] font-bold tracking-widest text-blue-500 bg-blue-50 px-3 py-2 rounded-full">
             {tag}
           </span>
-
         </div>
 
         {/* Card content */}
@@ -256,7 +257,6 @@ const FeatureBox = ({ title, desc, icon, tag, onClick, index }) => {
             →
           </span>
         </div>
-
       </div>
     </div>
   );
