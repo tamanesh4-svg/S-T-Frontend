@@ -8,6 +8,29 @@ const MAX_MARKS = 25;
 const API_URL =
   "https://school-management-node-backend.onrender.com";
 
+// ================= AUTH HELPERS =================
+const getToken = (navigate) => {
+  const token = sessionStorage.getItem("teacherToken");
+
+  if (!token) {
+    navigate("/teacher/login");
+    return null;
+  }
+
+  return token;
+};
+
+const handleAuthError = (status, navigate) => {
+  if (status === 401 || status === 403) {
+    sessionStorage.removeItem("teacherToken");
+    sessionStorage.removeItem("teacher");
+    navigate("/teacher/login");
+    return true;
+  }
+
+  return false;
+};
+
 const Results = () => {
   const navigate = useNavigate();
 
@@ -17,34 +40,11 @@ const Results = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ================= AUTH HELPERS =================
-  const getToken = () => {
-    const token = sessionStorage.getItem("teacherToken");
-
-    if (!token) {
-      navigate("/teacher/login");
-      return null;
-    }
-
-    return token;
-  };
-
-  const handleAuthError = (status) => {
-    if (status === 401 || status === 403) {
-      sessionStorage.removeItem("teacherToken");
-      sessionStorage.removeItem("teacher");
-      navigate("/teacher/login");
-      return true;
-    }
-
-    return false;
-  };
-
   // ================= FETCH CLASSES =================
   useEffect(() => {
     const fetchClasses = async () => {
       try {
-        const token = getToken();
+        const token = getToken(navigate);
         if (!token) return;
 
         const response = await fetch(
@@ -57,7 +57,7 @@ const Results = () => {
           }
         );
 
-        if (handleAuthError(response.status)) return;
+        if (handleAuthError(response.status, navigate)) return;
 
         if (!response.ok) {
           throw new Error("Failed to fetch classes");
@@ -83,7 +83,7 @@ const Results = () => {
     if (!classId) return;
 
     try {
-      const token = getToken();
+      const token = getToken(navigate);
       if (!token) return;
 
       setLoading(true);
@@ -98,7 +98,7 @@ const Results = () => {
         }
       );
 
-      if (handleAuthError(response.status)) return;
+      if (handleAuthError(response.status, navigate)) return;
 
       if (!response.ok) {
         throw new Error("Failed to fetch students");
@@ -133,7 +133,7 @@ const Results = () => {
     }
 
     try {
-      const token = getToken();
+      const token = getToken(navigate);
       if (!token) return;
 
       setSaving(true);
@@ -160,7 +160,7 @@ const Results = () => {
         }
       );
 
-      if (handleAuthError(response.status)) return;
+      if (handleAuthError(response.status, navigate)) return;
 
       const data = await response.json();
 
