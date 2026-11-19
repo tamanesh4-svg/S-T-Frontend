@@ -1,5 +1,9 @@
-
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://school-management-node-backend.onrender.com";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const slots = [1, 2, 3, 4, 5];
@@ -12,52 +16,126 @@ const RoutineManager = () => {
   const [selectedClass, setSelectedClass] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Fetch classes (COOKIE BASED ✅)
+  const navigate = useNavigate();
+
+  // ===============================
+  // GET TEACHER TOKEN
+  // ===============================
+  const getToken = () => {
+    const token = sessionStorage.getItem("teacherToken");
+
+    if (!token) {
+      navigate("/teacher/login");
+      return null;
+    }
+
+    return token;
+  };
+
+  // ===============================
+  // HANDLE AUTHENTICATION ERRORS
+  // ===============================
+  const handleAuthError = (status) => {
+    if (status === 401 || status === 403) {
+      sessionStorage.removeItem("teacherToken");
+      sessionStorage.removeItem("teacher");
+      navigate("/teacher/login");
+      return true;
+    }
+
+    return false;
+  };
+
+  // ===============================
+  // FETCH CLASSES
+  // ===============================
   const fetchClasses = useCallback(async () => {
+    const token = getToken();
+
+    if (!token) return;
+
     try {
-      const res = await fetch("https://school-management-node-backend.onrender.com/api/teacher/classes", {
-        credentials: "include"
+      const res = await fetch(`${API_URL}/api/teacher/classes`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
+      if (handleAuthError(res.status)) return;
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch classes: ${res.status}`);
+      }
+
       const data = await res.json();
+
       console.log("CLASSES:", data);
 
-      setClasses(Array.isArray(data) ? data : []);
+      setClasses(
+        Array.isArray(data) ? data : data.classes || []
+      );
     } catch (err) {
       console.error("Error fetching classes:", err);
     }
-  }, []);
+  }, [navigate]);
 
-  // 🔹 Fetch routine (COOKIE BASED ✅)
+  // ===============================
+  // FETCH ROUTINE
+  // ===============================
   const fetchRoutine = useCallback(async () => {
+    const token = getToken();
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch("https://school-management-node-backend.onrender.com/api/routine", {
-        credentials: "include"
+      const res = await fetch(`${API_URL}/api/routine`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
+      if (handleAuthError(res.status)) return;
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch routine: ${res.status}`);
+      }
+
       const data = await res.json();
+
       console.log("ROUTINE:", data);
 
-      setRoutine(Array.isArray(data) ? data : []);
+      setRoutine(
+        Array.isArray(data) ? data : data.routine || []
+      );
     } catch (err) {
       console.error("Error fetching routine:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
-  // 🔹 Build timetable
+  // ===============================
+  // BUILD TIMETABLE
+  // ===============================
   const buildTable = useCallback(() => {
-    let table = {};
+    const table = {};
 
-    days.forEach(day => {
+    days.forEach((day) => {
       table[day] = {};
-      slots.forEach(slot => {
+
+      slots.forEach((slot) => {
         table[day][slot] = null;
       });
     });
 
-    routine.forEach(r => {
+    routine.forEach((r) => {
       if (table[r.day] && slots.includes(Number(r.slot))) {
         table[r.day][r.slot] = r;
       }
@@ -66,7 +144,9 @@ const RoutineManager = () => {
     setTimetable(table);
   }, [routine]);
 
-  // 🔥 Load data
+  // ===============================
+  // LOAD DATA
+  // ===============================
   useEffect(() => {
     fetchClasses();
     fetchRoutine();
@@ -76,53 +156,89 @@ const RoutineManager = () => {
     buildTable();
   }, [buildTable]);
 
-  // 🔹 Add routine
+  // ===============================
+  // ADD ROUTINE
+  // ===============================
   const handleAdd = async () => {
-    if (!selectedClass) return alert("Select class");
+    if (!selectedClass) {
+      alert("Select class");
+      return;
+    }
+
+    if (!selectedSlot) return;
+
+    const token = getToken();
+
+    if (!token) return;
 
     try {
-      const response = await fetch("https://school-management-node-backend.onrender.com/api/routine/add", {
+      const response = await fetch(`${API_URL}/api/routine/add`, {
         method: "POST",
         credentials: "include",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           classId: selectedClass,
           day: selectedSlot.day,
-          slot: selectedSlot.slot
-        })
+          slot: selectedSlot.slot,
+        }),
       });
 
+      if (handleAuthError(response.status)) return;
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Failed to add routine");
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to add routine");
+      }
 
       setSelectedSlot(null);
       setSelectedClass("");
-      fetchRoutine();
+
+      await fetchRoutine();
     } catch (err) {
       console.error("Error adding routine:", err);
+      alert(err.message || "Failed to add routine");
     }
   };
 
-  // 🔹 Delete routine
+  // ===============================
+  // DELETE ROUTINE
+  // ===============================
   const handleDelete = async (id) => {
+    const token = getToken();
+
+    if (!token) return;
+
     try {
-      const response = await fetch(`https://school-management-node-backend.onrender.com/api/routine/${id}`, {
+      const response = await fetch(`${API_URL}/api/routine/${id}`, {
         method: "DELETE",
-        credentials: "include"
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Failed to delete routine");
+      if (handleAuthError(response.status)) return;
 
-      fetchRoutine();
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete routine");
+      }
+
+      await fetchRoutine();
     } catch (err) {
-      console.error("Error deleting:", err);
+      console.error("Error deleting routine:", err);
+      alert(err.message || "Failed to delete routine");
     }
   };
 
-  // 🔹 Loading UI
+  // ===============================
+  // LOADING UI
+  // ===============================
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
@@ -133,7 +249,9 @@ const RoutineManager = () => {
 
   return (
     <div className="p-6 text-white">
-      <h2 className="text-2xl font-bold mb-4">Routine Manager</h2>
+      <h2 className="text-2xl font-bold mb-4">
+        Routine Manager
+      </h2>
 
       {/* TABLE */}
       <div className="overflow-x-auto">
@@ -141,7 +259,8 @@ const RoutineManager = () => {
           <thead>
             <tr className="bg-gray-800">
               <th className="p-2">Day</th>
-              {slots.map(slot => (
+
+              {slots.map((slot) => (
                 <th key={slot} className="p-2">
                   Slot {slot}
                 </th>
@@ -150,11 +269,11 @@ const RoutineManager = () => {
           </thead>
 
           <tbody>
-            {days.map(day => (
+            {days.map((day) => (
               <tr key={day} className="border-t border-gray-700">
                 <td className="p-2 font-semibold">{day}</td>
 
-                {slots.map(slot => {
+                {slots.map((slot) => {
                   const data = timetable[day]?.[slot];
 
                   return (
@@ -204,7 +323,7 @@ const RoutineManager = () => {
             >
               <option value="">Select Class</option>
 
-              {classes.map(c => (
+              {classes.map((c) => (
                 <option key={c._id} value={c._id}>
                   {c.className}
                 </option>

@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "https://school-management-node-backend.onrender.com";
 
 const Attendance = () => {
   const [classes, setClasses] = useState([]);
@@ -7,63 +12,141 @@ const Attendance = () => {
   const [students, setStudents] = useState([]);
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [classesLoading, setClassesLoading] = useState(true);
+
+  const navigate = useNavigate();
 
   // ===============================
-  // FETCH CLASSES ✅ FIXED
+  // GET TEACHER TOKEN
+  // ===============================
+  const getToken = () => {
+    const token = sessionStorage.getItem("teacherToken");
+
+    if (!token) {
+      navigate("/teacher/login");
+      return null;
+    }
+
+    return token;
+  };
+
+  // ===============================
+  // HANDLE AUTHENTICATION ERRORS
+  // ===============================
+  const handleAuthError = (status) => {
+    if (status === 401 || status === 403) {
+      sessionStorage.removeItem("teacherToken");
+      sessionStorage.removeItem("teacher");
+      navigate("/teacher/login");
+      return true;
+    }
+
+    return false;
+  };
+
+  // ===============================
+  // FETCH CLASSES
   // ===============================
   useEffect(() => {
     const fetchClasses = async () => {
+      const token = getToken();
+
+      if (!token) {
+        setClassesLoading(false);
+        return;
+      }
+
       try {
-        const res = await fetch(
-          "https://school-management-node-backend.onrender.com/api/teacher/classes",
-          {
-            credentials: "include", // 🔥 VERY IMPORTANT
-          }
-        );
+        const res = await fetch(`${API_URL}/api/teacher/classes`, {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (handleAuthError(res.status)) return;
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch classes: ${res.status}`);
+        }
 
         const data = await res.json();
+
         console.log("CLASSES DATA:", data);
 
-        // ensure array
-        setClasses(Array.isArray(data) ? data : []);
+        setClasses(
+          Array.isArray(data) ? data : data.classes || []
+        );
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching classes:", err);
         setClasses([]);
+      } finally {
+        setClassesLoading(false);
       }
     };
 
     fetchClasses();
-  }, []);
+  }, [navigate]);
 
   // ===============================
-  // SELECT CLASS
+  // SELECT CLASS AND FETCH STUDENTS
   // ===============================
   const handleClassChange = async (e) => {
     const classId = e.target.value;
+
     setSelectedClassId(classId);
+    setStudents([]);
+
+    if (!classId) {
+      setSelectedClassName("");
+      return;
+    }
 
     const selected = classes.find((c) => c._id === classId);
-    setSelectedClassName(selected?.className || selected?.name || "");
+
+    setSelectedClassName(
+      selected?.className || selected?.name || ""
+    );
+
+    const token = getToken();
+
+    if (!token) return;
 
     try {
       const res = await fetch(
-        `https://school-management-node-backend.onrender.com/api/teacher/class/${classId}/students`,
+        `${API_URL}/api/teacher/class/${classId}/students`,
         {
-          credentials: "include", // 🔥 IMPORTANT
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
+      if (handleAuthError(res.status)) return;
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch students: ${res.status}`);
+      }
+
       const data = await res.json();
+
       console.log("STUDENTS DATA:", data);
 
-      const formatted = (Array.isArray(data) ? data : []).map((s) => ({
+      const studentList = Array.isArray(data)
+        ? data
+        : data.students || [];
+
+      const formatted = studentList.map((s) => ({
         ...s,
         status: "absent",
       }));
 
       setStudents(formatted);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching students:", err);
       setStudents([]);
     }
   };
@@ -72,9 +155,11 @@ const Attendance = () => {
   // CHANGE ATTENDANCE
   // ===============================
   const handleAttendanceChange = (index, status) => {
-    const updated = [...students];
-    updated[index].status = status;
-    setStudents(updated);
+    setStudents((prev) =>
+      prev.map((student, i) =>
+        i === index ? { ...student, status } : student
+      )
+    );
   };
 
   // ===============================
@@ -86,6 +171,10 @@ const Attendance = () => {
       return;
     }
 
+    const token = getToken();
+
+    if (!token) return;
+
     try {
       setLoading(true);
 
@@ -94,23 +183,21 @@ const Attendance = () => {
         status: s.status,
       }));
 
-      const res = await fetch(
-        "https://school-management-node-backend.onrender.com/api/attendance/mark",
-        
-        {
-          method: "POST",
-          credentials: "include",
-          
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            classId: selectedClassId,
-            date,
-            records,
-          }),
-        }
-      );
+      const res = await fetch(`${API_URL}/api/attendance/mark`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          classId: selectedClassId,
+          date,
+          records,
+        }),
+      });
+
+      if (handleAuthError(res.status)) return;
 
       const data = await res.json();
 
@@ -119,10 +206,10 @@ const Attendance = () => {
         return;
       }
 
-      alert("✅ Attendance saved successfully");
+      alert("Attendance saved successfully!");
     } catch (err) {
-      console.error(err);
-      alert("Server error");
+      console.error("Error saving attendance:", err);
+      alert("Server error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -139,6 +226,7 @@ const Attendance = () => {
         <label className="block text-sm font-medium text-gray-600 mb-2">
           Select Date
         </label>
+
         <input
           type="date"
           value={date}
@@ -152,12 +240,16 @@ const Attendance = () => {
         <label className="block text-sm font-medium text-gray-600 mb-2">
           Select Class
         </label>
+
         <select
           onChange={handleClassChange}
           value={selectedClassId}
           className="w-full p-2 border rounded-lg"
+          disabled={classesLoading}
         >
-          <option value="">-- Choose Class --</option>
+          <option value="">
+            {classesLoading ? "Loading classes..." : "-- Choose Class --"}
+          </option>
 
           {classes.map((cls) => (
             <option key={cls._id} value={cls._id}>
@@ -185,41 +277,51 @@ const Attendance = () => {
               </thead>
 
               <tbody>
-                {students.map((student, index) => (
-                  <tr key={student._id}>
-                    <td className="border p-2 text-center">
-                      {student.roll}
-                    </td>
-                    <td className="border p-2">
-                      {student.name}
-                    </td>
-                    <td className="border p-2 text-center">
-                      <label className="mr-4">
-                        <input
-                          type="radio"
-                          name={`att-${index}`}
-                          checked={student.status === "present"}
-                          onChange={() =>
-                            handleAttendanceChange(index, "present")
-                          }
-                        />{" "}
-                        Present
-                      </label>
-
-                      <label>
-                        <input
-                          type="radio"
-                          name={`att-${index}`}
-                          checked={student.status === "absent"}
-                          onChange={() =>
-                            handleAttendanceChange(index, "absent")
-                          }
-                        />{" "}
-                        Absent
-                      </label>
+                {students.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" className="border p-4 text-center">
+                      No students available
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  students.map((student, index) => (
+                    <tr key={student._id}>
+                      <td className="border p-2 text-center">
+                        {student.roll}
+                      </td>
+
+                      <td className="border p-2">
+                        {student.name}
+                      </td>
+
+                      <td className="border p-2 text-center">
+                        <label className="mr-4">
+                          <input
+                            type="radio"
+                            name={`att-${index}`}
+                            checked={student.status === "present"}
+                            onChange={() =>
+                              handleAttendanceChange(index, "present")
+                            }
+                          />{" "}
+                          Present
+                        </label>
+
+                        <label>
+                          <input
+                            type="radio"
+                            name={`att-${index}`}
+                            checked={student.status === "absent"}
+                            onChange={() =>
+                              handleAttendanceChange(index, "absent")
+                            }
+                          />{" "}
+                          Absent
+                        </label>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
