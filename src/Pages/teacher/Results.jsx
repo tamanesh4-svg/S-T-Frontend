@@ -1,26 +1,67 @@
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const CA_FIELDS = ["ca1", "ca2", "ca3", "ca4"];
 const MAX_MARKS = 25;
 
+const API_URL =
+  "https://school-management-node-backend.onrender.com";
+
 const Results = () => {
+  const navigate = useNavigate();
+
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ================= AUTH HELPERS =================
+  const getToken = () => {
+    const token = sessionStorage.getItem("teacherToken");
+
+    if (!token) {
+      navigate("/teacher/login");
+      return null;
+    }
+
+    return token;
+  };
+
+  const handleAuthError = (status) => {
+    if (status === 401 || status === 403) {
+      sessionStorage.removeItem("teacherToken");
+      sessionStorage.removeItem("teacher");
+      navigate("/teacher/login");
+      return true;
+    }
+
+    return false;
+  };
+
   // ================= FETCH CLASSES =================
   useEffect(() => {
     const fetchClasses = async () => {
       try {
+        const token = getToken();
+        if (!token) return;
+
         const response = await fetch(
-          "https://school-management-node-backend.onrender.com/api/results/classes",
-          { credentials: "include" }
+          `${API_URL}/api/results/classes`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            credentials: "include",
+          }
         );
 
-        if (!response.ok) throw new Error("Failed to fetch classes");
+        if (handleAuthError(response.status)) return;
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch classes");
+        }
 
         const data = await response.json();
         setClasses(data);
@@ -30,7 +71,7 @@ const Results = () => {
     };
 
     fetchClasses();
-  }, []);
+  }, [navigate]);
 
   // ================= FETCH STUDENTS =================
   const handleClassChange = async (e) => {
@@ -42,14 +83,26 @@ const Results = () => {
     if (!classId) return;
 
     try {
+      const token = getToken();
+      if (!token) return;
+
       setLoading(true);
 
       const response = await fetch(
-        `https://school-management-node-backend.onrender.com/api/results/classes/${classId}/students`,
-        { credentials: "include" }
+        `${API_URL}/api/results/classes/${classId}/students`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+        }
       );
 
-      if (!response.ok) throw new Error("Failed to fetch students");
+      if (handleAuthError(response.status)) return;
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch students");
+      }
 
       const data = await response.json();
       setStudents(data);
@@ -80,14 +133,18 @@ const Results = () => {
     }
 
     try {
+      const token = getToken();
+      if (!token) return;
+
       setSaving(true);
 
       const response = await fetch(
-        "https://school-management-node-backend.onrender.com/api/results",
+        `${API_URL}/api/results`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           credentials: "include",
           body: JSON.stringify({
@@ -102,6 +159,8 @@ const Results = () => {
           }),
         }
       );
+
+      if (handleAuthError(response.status)) return;
 
       const data = await response.json();
 
