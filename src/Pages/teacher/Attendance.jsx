@@ -5,6 +5,30 @@ const API_URL =
   process.env.REACT_APP_API_URL ||
   "https://school-management-node-backend.onrender.com";
 
+// GET TEACHER TOKEN
+const getToken = (navigate) => {
+  const token = sessionStorage.getItem("teacherToken");
+
+  if (!token) {
+    navigate("/teacher/login");
+    return null;
+  }
+
+  return token;
+};
+
+// HANDLE AUTHENTICATION ERRORS
+const handleAuthError = (status, navigate) => {
+  if (status === 401 || status === 403) {
+    sessionStorage.removeItem("teacherToken");
+    sessionStorage.removeItem("teacher");
+    navigate("/teacher/login");
+    return true;
+  }
+
+  return false;
+};
+
 const Attendance = () => {
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -17,39 +41,11 @@ const Attendance = () => {
   const navigate = useNavigate();
 
   // ===============================
-  // GET TEACHER TOKEN
-  // ===============================
-  const getToken = () => {
-    const token = sessionStorage.getItem("teacherToken");
-
-    if (!token) {
-      navigate("/teacher/login");
-      return null;
-    }
-
-    return token;
-  };
-
-  // ===============================
-  // HANDLE AUTHENTICATION ERRORS
-  // ===============================
-  const handleAuthError = (status) => {
-    if (status === 401 || status === 403) {
-      sessionStorage.removeItem("teacherToken");
-      sessionStorage.removeItem("teacher");
-      navigate("/teacher/login");
-      return true;
-    }
-
-    return false;
-  };
-
-  // ===============================
   // FETCH CLASSES
   // ===============================
   useEffect(() => {
     const fetchClasses = async () => {
-      const token = getToken();
+      const token = getToken(navigate);
 
       if (!token) {
         setClassesLoading(false);
@@ -65,7 +61,7 @@ const Attendance = () => {
           },
         });
 
-        if (handleAuthError(res.status)) return;
+        if (handleAuthError(res.status, navigate)) return;
 
         if (!res.ok) {
           throw new Error(`Failed to fetch classes: ${res.status}`);
@@ -109,7 +105,7 @@ const Attendance = () => {
       selected?.className || selected?.name || ""
     );
 
-    const token = getToken();
+    const token = getToken(navigate);
 
     if (!token) return;
 
@@ -125,7 +121,7 @@ const Attendance = () => {
         }
       );
 
-      if (handleAuthError(res.status)) return;
+      if (handleAuthError(res.status, navigate)) return;
 
       if (!res.ok) {
         throw new Error(`Failed to fetch students: ${res.status}`);
@@ -171,7 +167,7 @@ const Attendance = () => {
       return;
     }
 
-    const token = getToken();
+    const token = getToken(navigate);
 
     if (!token) return;
 
@@ -197,7 +193,7 @@ const Attendance = () => {
         }),
       });
 
-      if (handleAuthError(res.status)) return;
+      if (handleAuthError(res.status, navigate)) return;
 
       const data = await res.json();
 

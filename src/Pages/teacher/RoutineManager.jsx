@@ -8,6 +8,30 @@ const API_URL =
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const slots = [1, 2, 3, 4, 5];
 
+// GET TEACHER TOKEN
+const getToken = (navigate) => {
+  const token = sessionStorage.getItem("teacherToken");
+
+  if (!token) {
+    navigate("/teacher/login");
+    return null;
+  }
+
+  return token;
+};
+
+// HANDLE AUTHENTICATION ERRORS
+const handleAuthError = (status, navigate) => {
+  if (status === 401 || status === 403) {
+    sessionStorage.removeItem("teacherToken");
+    sessionStorage.removeItem("teacher");
+    navigate("/teacher/login");
+    return true;
+  }
+
+  return false;
+};
+
 const RoutineManager = () => {
   const [classes, setClasses] = useState([]);
   const [routine, setRoutine] = useState([]);
@@ -19,38 +43,10 @@ const RoutineManager = () => {
   const navigate = useNavigate();
 
   // ===============================
-  // GET TEACHER TOKEN
-  // ===============================
-  const getToken = () => {
-    const token = sessionStorage.getItem("teacherToken");
-
-    if (!token) {
-      navigate("/teacher/login");
-      return null;
-    }
-
-    return token;
-  };
-
-  // ===============================
-  // HANDLE AUTHENTICATION ERRORS
-  // ===============================
-  const handleAuthError = (status) => {
-    if (status === 401 || status === 403) {
-      sessionStorage.removeItem("teacherToken");
-      sessionStorage.removeItem("teacher");
-      navigate("/teacher/login");
-      return true;
-    }
-
-    return false;
-  };
-
-  // ===============================
   // FETCH CLASSES
   // ===============================
   const fetchClasses = useCallback(async () => {
-    const token = getToken();
+    const token = getToken(navigate);
 
     if (!token) return;
 
@@ -63,7 +59,7 @@ const RoutineManager = () => {
         },
       });
 
-      if (handleAuthError(res.status)) return;
+      if (handleAuthError(res.status, navigate)) return;
 
       if (!res.ok) {
         throw new Error(`Failed to fetch classes: ${res.status}`);
@@ -85,7 +81,7 @@ const RoutineManager = () => {
   // FETCH ROUTINE
   // ===============================
   const fetchRoutine = useCallback(async () => {
-    const token = getToken();
+    const token = getToken(navigate);
 
     if (!token) {
       setLoading(false);
@@ -101,7 +97,7 @@ const RoutineManager = () => {
         },
       });
 
-      if (handleAuthError(res.status)) return;
+      if (handleAuthError(res.status, navigate)) return;
 
       if (!res.ok) {
         throw new Error(`Failed to fetch routine: ${res.status}`);
@@ -167,7 +163,7 @@ const RoutineManager = () => {
 
     if (!selectedSlot) return;
 
-    const token = getToken();
+    const token = getToken(navigate);
 
     if (!token) return;
 
@@ -186,7 +182,7 @@ const RoutineManager = () => {
         }),
       });
 
-      if (handleAuthError(response.status)) return;
+      if (handleAuthError(response.status, navigate)) return;
 
       const data = await response.json();
 
@@ -208,7 +204,7 @@ const RoutineManager = () => {
   // DELETE ROUTINE
   // ===============================
   const handleDelete = async (id) => {
-    const token = getToken();
+    const token = getToken(navigate);
 
     if (!token) return;
 
@@ -221,7 +217,7 @@ const RoutineManager = () => {
         },
       });
 
-      if (handleAuthError(response.status)) return;
+      if (handleAuthError(response.status, navigate)) return;
 
       const data = await response.json();
 
