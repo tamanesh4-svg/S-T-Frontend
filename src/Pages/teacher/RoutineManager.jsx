@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useState, useCallback } from "react";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const slots = [1, 2, 3, 4, 5];
@@ -12,7 +13,7 @@ const RoutineManager = () => {
   const [loading, setLoading] = useState(true);
 
   // 🔹 Fetch classes (COOKIE BASED ✅)
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     try {
       const res = await fetch("https://school-management-node-backend.onrender.com/api/teacher/classes", {
         credentials: "include"
@@ -25,10 +26,10 @@ const RoutineManager = () => {
     } catch (err) {
       console.error("Error fetching classes:", err);
     }
-  };
+  }, []);
 
   // 🔹 Fetch routine (COOKIE BASED ✅)
-  const fetchRoutine = async () => {
+  const fetchRoutine = useCallback(async () => {
     try {
       const res = await fetch("https://school-management-node-backend.onrender.com/api/routine", {
         credentials: "include"
@@ -43,10 +44,10 @@ const RoutineManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 🔹 Build timetable
-  const buildTable = () => {
+  const buildTable = useCallback(() => {
     let table = {};
 
     days.forEach(day => {
@@ -63,17 +64,17 @@ const RoutineManager = () => {
     });
 
     setTimetable(table);
-  };
+  }, [routine]);
 
   // 🔥 Load data
   useEffect(() => {
     fetchClasses();
     fetchRoutine();
-  }, []);
+  }, [fetchClasses, fetchRoutine]);
 
   useEffect(() => {
     buildTable();
-  }, [routine]);
+  }, [buildTable]);
 
   // 🔹 Add routine
   const handleAdd = async () => {
@@ -94,7 +95,8 @@ const RoutineManager = () => {
       });
 
       const data = await response.json();
-if (!response.ok) throw new Error(data.message || "Failed to add routine");
+      if (!response.ok) throw new Error(data.message || "Failed to add routine");
+
       setSelectedSlot(null);
       setSelectedClass("");
       fetchRoutine();
@@ -110,8 +112,10 @@ if (!response.ok) throw new Error(data.message || "Failed to add routine");
         method: "DELETE",
         credentials: "include"
       });
+
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Failed to delete routine");
+
       fetchRoutine();
     } catch (err) {
       console.error("Error deleting:", err);

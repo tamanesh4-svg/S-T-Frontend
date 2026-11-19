@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useState, useCallback } from "react";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const slots = [1, 2, 3, 4, 5];
@@ -11,34 +12,34 @@ const StudentRoutine = () => {
   const token = sessionStorage.getItem("token");
 
   // 🔹 Fetch student routine
-const fetchRoutine = async () => {
-  try {
-    const res = await fetch("https://school-management-node-backend.onrender.com/api/student/routine", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      cache: "no-store" // ✅ disables caching
-    });
+  const fetchRoutine = useCallback(async () => {
+    try {
+      const res = await fetch("https://school-management-node-backend.onrender.com/api/student/routine", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        cache: "no-store"
+      });
 
-    if (!res.ok) {
-      throw new Error("Failed to fetch routine");
+      if (!res.ok) {
+        throw new Error("Failed to fetch routine");
+      }
+
+      const data = await res.json();
+      console.log("STUDENT ROUTINE:", data);
+
+      setRoutine(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching routine:", err);
+    } finally {
+      setLoading(false);
     }
-
-    const data = await res.json();
-    console.log("STUDENT ROUTINE:", data);
-
-    setRoutine(Array.isArray(data) ? data : []);
-  } catch (err) {
-    console.error("Error fetching routine:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+  }, [token]);
 
   // 🔹 Build timetable
-  const buildTable = () => {
+  const buildTable = useCallback(() => {
     let table = {};
 
     days.forEach(day => {
@@ -53,15 +54,15 @@ const fetchRoutine = async () => {
     });
 
     setTimetable(table);
-  };
+  }, [routine]);
 
   useEffect(() => {
     fetchRoutine();
-  }, []);
+  }, [fetchRoutine]);
 
   useEffect(() => {
     buildTable();
-  }, [routine]);
+  }, [buildTable]);
 
   // 🔹 Loading UI
   if (loading) {
@@ -74,7 +75,7 @@ const fetchRoutine = async () => {
 
   return (
     <div className="min-h-screen bg-[#EAF3FF] px-4 py-8">
-      
+
       {/* Header */}
       <h1 className="text-2xl sm:text-3xl font-bold text-blue-700 text-center mb-6">
         My Class Routine 📅
@@ -83,7 +84,7 @@ const fetchRoutine = async () => {
       {/* Table */}
       <div className="max-w-6xl mx-auto overflow-x-auto bg-white shadow-md rounded-xl">
         <table className="w-full text-center border-collapse">
-          
+
           <thead>
             <tr className="bg-blue-200">
               <th className="p-3 border">Day</th>
